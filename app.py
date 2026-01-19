@@ -52,7 +52,7 @@ st.sidebar.title("📊 练习统计")
 
 subject_map = {
     "临床检验基础": "linjian.json",
-    "待添加学科2": "subject2.json"
+    "临床免疫学检验": "mianyi.json"
 }
 selected_sub_name = st.sidebar.selectbox("切换学科模块", list(subject_map.keys()))
 
