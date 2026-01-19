@@ -3,34 +3,35 @@ import json
 import random
 import time
 
-# 1. 页面配置
+# 1. 页面配置：保持宽屏模式，默认收起左侧边栏
 st.set_page_config(page_title="医考刷题王", layout="wide", initial_sidebar_state="collapsed")
 
-# 2. 注入精准 CSS：只针对“题目看板”内的按钮进行圆形处理
+# 2. 注入 CSS：精准控制看板圆圈和布局
 st.markdown("""
     <style>
-    /* 重点：只让带有 [data-testid="stExpander"] 容器内的按钮变圆 */
+    /* 仅针对题目看板内部的按钮：变为圆形 */
     [data-testid="stExpander"] .stButton > button {
         border-radius: 50% !important;
-        width: 40px !important;
-        height: 40px !important;
+        width: 38px !important;
+        height: 38px !important;
         padding: 0px !important;
-        line-height: 40px !important;
+        line-height: 38px !important;
         display: inline-block !important;
-        margin: 4px !important;
+        margin: 3px !important;
         border: none !important;
         font-weight: bold !important;
+        font-size: 13px !important;
     }
     
-    /* 鼠标悬停效果 */
-    [data-testid="stExpander"] .stButton > button:hover {
-        transform: scale(1.1);
-        box-shadow: 0px 2px 5px rgba(0,0,0,0.2);
-    }
-    
-    /* 保持主界面和侧边栏按钮（下一题、重置）为原始长方形 */
+    /* 保持功能按钮（下一题、重置）为正常样式 */
     .stButton > button {
-        border-radius: 4px; /* 恢复默认微圆角 */
+        border-radius: 6px;
+    }
+    
+    /* 优化整体页面的背景和间距 */
+    .main .block-container {
+        padding-top: 1.5rem;
+        max-width: 95%;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -42,7 +43,7 @@ def load_data(filename):
     except Exception:
         return []
 
-# 3. 初始化状态
+# --- 3. 初始化全局状态 ---
 if 'all_questions' not in st.session_state:
     st.session_state.all_questions = []
 if 'shuffled_indices' not in st.session_state:
@@ -58,12 +59,12 @@ if 'last_sub' not in st.session_state:
 
 # --- 4. 左侧侧边栏 ---
 with st.sidebar:
-    st.title("⚙️ 设置")
+    st.title("⚙️ 设置与统计")
     subject_map = {
         "临床检验基础": "linjian.json",
-        "学科2": "subject2.json"
+        "待添加学科2": "subject2.json"
     }
-    selected_sub_name = st.selectbox("当前学科", list(subject_map.keys()))
+    selected_sub_name = st.selectbox("当前选择学科", list(subject_map.keys()))
     
     st.divider()
     correct_count = list(st.session_state.results.values()).count("correct")
@@ -71,13 +72,13 @@ with st.sidebar:
     total_q = len(st.session_state.all_questions)
     
     if total_q > 0:
-        st.metric("正确", f"{correct_count}")
-        st.metric("错误", f"{incorrect_count}")
+        st.metric("正确数量", f"{correct_count}")
+        st.metric("错误数量", f"{incorrect_count}")
         if st.button("🔄 重置进度"):
             st.session_state.last_sub = ""
             st.rerun()
 
-# --- 5. 加载逻辑 ---
+# 数据加载逻辑
 if selected_sub_name != st.session_state.last_sub:
     data = load_data(subject_map[selected_sub_name])
     if data:
@@ -90,28 +91,29 @@ if selected_sub_name != st.session_state.last_sub:
         st.session_state.last_sub = selected_sub_name
         st.session_state.error_mode = False
 
-# --- 6. 主界面布局 ---
+# --- 5. 主界面布局：左右分栏 ---
 main_col, board_col = st.columns([0.7, 0.3])
 
 with main_col:
     if not st.session_state.all_questions:
-        st.info("👋 请确保数据文件已正确上传。")
+        st.info("👋 欢迎！请确保对应学科的 JSON 数据文件已上传。")
     elif st.session_state.current_idx_in_list >= len(st.session_state.all_questions):
         st.balloons()
-        st.success("🏆 恭喜通关所有题目！")
+        st.success("🏆 本学科已全部练习完毕！")
     else:
+        # 当前题目内容
         cur_list_idx = st.session_state.current_idx_in_list
         actual_q_idx = st.session_state.shuffled_indices[cur_list_idx]
         q = st.session_state.all_questions[actual_q_idx]
 
         st.subheader(f"📖 {selected_sub_name}")
-        st.caption(f"当前进度：{cur_list_idx + 1} / {total_q}")
+        st.caption(f"当前练习：第 {cur_list_idx + 1} 题 / 共 {total_q} 题")
         st.divider()
         
         st.markdown(f"#### {q['question']}")
         
         user_choice = st.radio(
-            "选择答案：", 
+            "选择你的答案：", 
             q['options'], 
             index=None, 
             key=f"active_q_{actual_q_idx}",
@@ -122,7 +124,7 @@ with main_col:
             correct_letter = q['answer'].strip().upper()
             if user_choice.startswith(correct_letter):
                 st.session_state.results[actual_q_idx] = "correct"
-                st.success("✅ 正确！")
+                st.success("✅ 正确！即将进入下一题...")
                 time.sleep(0.7)
                 st.session_state.current_idx_in_list += 1
                 st.rerun()
@@ -133,44 +135,42 @@ with main_col:
     
         if st.session_state.error_mode:
             st.error(f"❌ 答错了！正确答案是：**{q['answer']}**")
-            # 这里的“下一题”按钮现在会恢复成原始的长方形
             if st.button("下一题 ➔", type="primary"):
                 st.session_state.error_mode = False
                 st.session_state.current_idx_in_list += 1
                 st.rerun()
 
+# --- 6. 右侧看板：解决长网页问题 ---
 with board_col:
-    # 这里的按钮会因为在 expander 内部而变成圆形
-    with st.expander("📍 题目看板", expanded=True):
-        grid_cols = st.columns(4) 
-        for i in range(total_q):
-            status = st.session_state.results.get(i)
-            
-            # 颜色定义
-            if status == "correct":
-                bg_color = "#28a745"
-                txt_color = "white"
-            elif status == "incorrect":
-                bg_color = "#dc3545"
-                txt_color = "white"
-            else:
-                bg_color = "#f0f2f6"
-                txt_color = "#333"
+    with st.expander("📍 题目看板 (可滑动)", expanded=True):
+        # 核心改动：使用固定高度的容器，高度设为 500 像素
+        [Image of a vertical scrollbar within a UI panel]
+        with st.container(height=500):
+            grid_cols = st.columns(4) 
+            for i in range(total_q):
+                status = st.session_state.results.get(i)
+                
+                # 动态颜色注入
+                if status == "correct":
+                    bg_color, txt_color = "#28a745", "white"
+                elif status == "incorrect":
+                    bg_color, txt_color = "#dc3545", "white"
+                else:
+                    bg_color, txt_color = "#f0f2f6", "#333"
     
-            # 仅针对看板按钮注入独立背景颜色
-            st.markdown(f"""
-                <style>
-                button[key="btn_{i}"] {{
-                    background-color: {bg_color} !important;
-                    color: {txt_color} !important;
-                }}
-                </style>
-            """, unsafe_allow_html=True)
-            
-            if grid_cols[i % 4].button(f"{i+1}", key=f"btn_{i}"):
-                try:
-                    st.session_state.current_idx_in_list = st.session_state.shuffled_indices.index(i)
-                    st.session_state.error_mode = False
-                    st.rerun()
-                except ValueError:
-                    pass
+                st.markdown(f"""
+                    <style>
+                    button[key="btn_{i}"] {{
+                        background-color: {bg_color} !important;
+                        color: {txt_color} !important;
+                    }}
+                    </style>
+                """, unsafe_allow_html=True)
+                
+                if grid_cols[i % 4].button(f"{i+1}", key=f"btn_{i}"):
+                    try:
+                        st.session_state.current_idx_in_list = st.session_state.shuffled_indices.index(i)
+                        st.session_state.error_mode = False
+                        st.rerun()
+                    except ValueError:
+                        pass
