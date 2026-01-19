@@ -57,7 +57,7 @@ subject_map = {
     "临床生物化学检验": "shenghua.json",
     "临床微生物学检验": "weishengwu.json"
 }
-selected_sub_name = st.sidebar.selectbox("切换学科模块", list(subject_map.keys()))
+selected_sub_name = st.sidebar.radio("选择学科模块", list(subject_map.keys()))
 
 if selected_sub_name != st.session_state.last_sub:
     data = load_data(subject_map[selected_sub_name])
