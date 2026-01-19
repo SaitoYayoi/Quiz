@@ -4,7 +4,7 @@ import random
 import time
 
 # 页面基础设置
-st.set_page_config(page_title="医学刷题宝-视觉优化版", layout="centered")
+st.set_page_config(page_title="终章 Powered by zyz", layout="centered")
 
 # --- 新增：仅针对字体和间距的视觉微调 ---
 st.markdown("""
@@ -53,7 +53,8 @@ st.sidebar.title("📊 练习统计")
 subject_map = {
     "临床检验基础": "linjian.json",
     "临床免疫学检验": "mianyi.json",
-    "临床血液学检验": "xueye.json"
+    "临床血液学检验": "xueye.json",
+    "临床生物化学检验": "shenghua.json"
 }
 selected_sub_name = st.sidebar.selectbox("切换学科模块", list(subject_map.keys()))
 
