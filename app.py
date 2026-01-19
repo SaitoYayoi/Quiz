@@ -4,7 +4,7 @@ import random
 import time
 
 # 页面基础设置
-st.set_page_config(page_title="医学刷题宝", layout="centered")
+st.set_page_config(page_title="医学刷题宝-进度统计版", layout="centered")
 
 def load_data(filename):
     try:
@@ -13,79 +13,111 @@ def load_data(filename):
     except Exception:
         return []
 
-# --- 初始化状态 ---
-if 'questions' not in st.session_state:
-    st.session_state.questions = []
-if 'current_q' not in st.session_state:
-    st.session_state.current_q = None
-if 'last_sub' not in st.session_state:
-    st.session_state.last_sub = ""
+# --- 初始化 Session State (核心逻辑) ---
+if 'all_questions' not in st.session_state:
+    st.session_state.all_questions = [] # 原始题库
+if 'shuffled_indices' not in st.session_state:
+    st.session_state.shuffled_indices = [] # 打乱后的索引序列
+if 'current_idx_in_list' not in st.session_state:
+    st.session_state.current_idx_in_list = 0 # 当前做到第几张“牌”
+if 'stats' not in st.session_state:
+    st.session_state.stats = {"correct": 0, "incorrect": 0} # 统计数据
 if 'error_mode' not in st.session_state:
     st.session_state.error_mode = False
+if 'last_sub' not in st.session_state:
+    st.session_state.last_sub = ""
 
-# --- 侧边栏 ---
-st.sidebar.title("📚 学科模块")
-# 如果你有新学科，在这里添加对应的文件名
+# --- 侧边栏：设置与统计 ---
+st.sidebar.title("📊 练习统计")
+
 subject_map = {
     "临床检验基础": "linjian.json",
     "待添加学科2": "subject2.json"
 }
 selected_sub_name = st.sidebar.selectbox("切换学科", list(subject_map.keys()))
 
-# 切换学科逻辑
+# 切换学科或初始化时：洗牌
 if selected_sub_name != st.session_state.last_sub:
-    st.session_state.questions = load_data(subject_map[selected_sub_name])
-    if st.session_state.questions:
-        st.session_state.current_q = random.choice(st.session_state.questions)
-    st.session_state.last_sub = selected_sub_name
-    st.session_state.error_mode = False
+    data = load_data(subject_map[selected_sub_name])
+    if data:
+        st.session_state.all_questions = data
+        indices = list(range(len(data)))
+        random.shuffle(indices) # 彻底打乱顺序
+        st.session_state.shuffled_indices = indices
+        st.session_state.current_idx_in_list = 0
+        st.session_state.stats = {"correct": 0, "incorrect": 0}
+        st.session_state.last_sub = selected_sub_name
+        st.session_state.error_mode = False
 
-# --- 主界面 ---
+# 显示统计面板
+total_q = len(st.session_state.all_questions)
+if total_q > 0:
+    done_q = st.session_state.current_idx_in_list
+    progress = done_q / total_q
+    
+    st.sidebar.write(f"进度：{done_q} / {total_q}")
+    st.sidebar.progress(progress)
+    
+    col1, col2 = st.sidebar.columns(2)
+    col1.metric("正确", st.session_state.stats["correct"])
+    col2.metric("错误", st.session_state.stats["incorrect"])
+    
+    # 计算正确率
+    total_answered = st.session_state.stats["correct"] + st.session_state.stats["incorrect"]
+    accuracy = (st.session_state.stats["correct"] / total_answered * 100) if total_answered > 0 else 0
+    st.sidebar.write(f"当前正确率：{accuracy:.1f}%")
+    
+    if st.sidebar.button("重新开始本科练习"):
+        st.session_state.last_sub = "" # 触发重新初始化
+        st.rerun()
+
+# --- 主界面逻辑 ---
 st.title(f"📖 {selected_sub_name}")
 
-if not st.session_state.questions:
-    st.warning("⚠️ 请确保 linjian.json 已经上传且格式正确。")
+if not st.session_state.all_questions:
+    st.warning("⚠️ 未检测到有效题库。")
+elif st.session_state.current_idx_in_list >= total_q:
+    st.balloons()
+    st.success("🎉 太棒了！你已经完成了本学科的所有题目！")
+    st.write(f"最终正确率：{accuracy:.1f}%")
 else:
-    q = st.session_state.current_q
+    # 获取当前打乱后的题目
+    actual_idx = st.session_state.shuffled_indices[st.session_state.current_idx_in_list]
+    q = st.session_state.all_questions[actual_idx]
     
     st.divider()
-    st.markdown(f"**第 {q['id']} 题**")
+    st.markdown(f"**进度：{st.session_state.current_idx_in_list + 1} / {total_q}**")
     st.markdown(f"#### {q['question']}")
     
-    # 错误模式下禁用选项，防止重复触发
     is_disabled = st.session_state.error_mode
     
-    # 单选框：选中即触发判断
     user_choice = st.radio(
         "请选择答案：", 
         q['options'], 
         index=None, 
-        key=f"q_{q['id']}", 
+        key=f"q_{actual_idx}", # 使用题目原始ID作为key确保唯一性
         disabled=is_disabled
     )
     
-    # --- 核心判断逻辑 ---
+    # --- 自动判断逻辑 ---
     if user_choice and not st.session_state.error_mode:
         correct_letter = q['answer'].strip().upper()
         
         if user_choice.startswith(correct_letter):
-            # 答对了：直接显示绿色反馈，0.5秒后跳题
-            st.success("✅ 正确！")
-            time.sleep(0.5) 
-            st.session_state.current_q = random.choice(st.session_state.questions)
+            st.session_state.stats["correct"] += 1
+            st.success("✅ 正确！即将进入下一题...")
+            time.sleep(0.6)
+            st.session_state.current_idx_in_list += 1
             st.rerun()
         else:
-            # 答错了：开启错误模式
+            st.session_state.stats["incorrect"] += 1
             st.session_state.error_mode = True
             st.rerun()
     
-    # --- 错误拦截提示 ---
+    # --- 错误拦截模式 ---
     if st.session_state.error_mode:
         st.error(f"❌ 答错了！正确答案是：**{q['answer']}**")
         if st.button("下一题 ➔", type="primary"):
             st.session_state.error_mode = False
-            st.session_state.current_q = random.choice(st.session_state.questions)
+            st.session_state.current_idx_in_list += 1
             st.rerun()
-    
-    # 底部统计
-    st.sidebar.metric("题库总量", len(st.session_state.questions))
