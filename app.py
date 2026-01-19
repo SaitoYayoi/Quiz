@@ -143,8 +143,7 @@ with main_col:
 # --- 6. 右侧看板：解决长网页问题 ---
 with board_col:
     with st.expander("📍 题目看板 (可滑动)", expanded=True):
-        # 核心改动：使用固定高度的容器，高度设为 500 像素
-        [Image of a vertical scrollbar within a UI panel]
+        # 使用固定高度的容器解决网页过长问题
         with st.container(height=500):
             grid_cols = st.columns(4) 
             for i in range(total_q):
