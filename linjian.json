@@ -1,0 +1,14 @@
+[
+  {
+    "id": 1,
+    "question": "临床基础检验学技术的主要研究对象是",
+    "options": ["A.造血细胞", "B.造血器官", "C.外周血液和各种体液", "D.造血干细胞", "E.造血组织"],
+    "answer": "C"
+  },
+  {
+    "id": 2,
+    "question": "世界上最早和原始的临床检验是",
+    "options": ["A.希腊名医 Hippocrates 用直观法检查尿液的颜色、气味等", "B.荷兰人 Leeuwenhock 发明了显微镜", "C.显微镜观察血液中的红细胞", "D. Landsteiner 检测人类ABO血型", "E. Ehrlich 和 Romanowsky 发明了染色技术"],
+    "answer": "A"
+  }
+]
