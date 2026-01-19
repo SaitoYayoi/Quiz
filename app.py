@@ -3,10 +3,10 @@ import json
 import random
 import time
 
-# 1. 页面配置：保持宽屏模式，默认收起左侧边栏
+# 1. 页面配置
 st.set_page_config(page_title="医考刷题王", layout="wide", initial_sidebar_state="collapsed")
 
-# 2. 注入 CSS：精准控制看板圆圈和布局
+# 2. 注入全局 CSS：美化界面与圆形按钮
 st.markdown("""
     <style>
     /* 仅针对题目看板内部的按钮：变为圆形 */
@@ -22,17 +22,10 @@ st.markdown("""
         font-weight: bold !important;
         font-size: 13px !important;
     }
-    
-    /* 保持功能按钮（下一题、重置）为正常样式 */
-    .stButton > button {
-        border-radius: 6px;
-    }
-    
-    /* 优化整体页面的背景和间距 */
-    .main .block-container {
-        padding-top: 1.5rem;
-        max-width: 95%;
-    }
+    /* 保持功能按钮为长方形 */
+    .stButton > button { border-radius: 6px; }
+    /* 优化整体页面间距 */
+    .main .block-container { padding-top: 1.5rem; max-width: 95%; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -78,7 +71,7 @@ with st.sidebar:
             st.session_state.last_sub = ""
             st.rerun()
 
-# 数据加载逻辑
+# 加载数据
 if selected_sub_name != st.session_state.last_sub:
     data = load_data(subject_map[selected_sub_name])
     if data:
@@ -91,17 +84,16 @@ if selected_sub_name != st.session_state.last_sub:
         st.session_state.last_sub = selected_sub_name
         st.session_state.error_mode = False
 
-# --- 5. 主界面布局：左右分栏 ---
+# --- 5. 主界面布局 ---
 main_col, board_col = st.columns([0.7, 0.3])
 
 with main_col:
     if not st.session_state.all_questions:
-        st.info("👋 欢迎！请确保对应学科的 JSON 数据文件已上传。")
+        st.info("👋 欢迎！请确保数据文件已正确上传。")
     elif st.session_state.current_idx_in_list >= len(st.session_state.all_questions):
         st.balloons()
         st.success("🏆 本学科已全部练习完毕！")
     else:
-        # 当前题目内容
         cur_list_idx = st.session_state.current_idx_in_list
         actual_q_idx = st.session_state.shuffled_indices[cur_list_idx]
         q = st.session_state.all_questions[actual_q_idx]
@@ -112,19 +104,13 @@ with main_col:
         
         st.markdown(f"#### {q['question']}")
         
-        user_choice = st.radio(
-            "选择你的答案：", 
-            q['options'], 
-            index=None, 
-            key=f"active_q_{actual_q_idx}",
-            disabled=st.session_state.error_mode
-        )
+        user_choice = st.radio("选择你的答案：", q['options'], index=None, key=f"active_q_{actual_q_idx}", disabled=st.session_state.error_mode)
     
         if user_choice and not st.session_state.error_mode:
             correct_letter = q['answer'].strip().upper()
             if user_choice.startswith(correct_letter):
                 st.session_state.results[actual_q_idx] = "correct"
-                st.success("✅ 正确！即将进入下一题...")
+                st.success("✅ 正确！")
                 time.sleep(0.7)
                 st.session_state.current_idx_in_list += 1
                 st.rerun()
@@ -140,36 +126,24 @@ with main_col:
                 st.session_state.current_idx_in_list += 1
                 st.rerun()
 
-# --- 6. 右侧看板：解决长网页问题 ---
+# --- 6. 右侧看板：解决空白与长网页 ---
 with board_col:
     with st.expander("📍 题目看板 (可滑动)", expanded=True):
-        # 使用固定高度的容器解决网页过长问题
-        with st.container(height=500):
+        # 1. 预先生成所有颜色样式并一次性注入，彻底解决空白问题
+        style_content = ""
+        for i in range(total_q):
+            status = st.session_state.results.get(i)
+            bg = "#28a745" if status == "correct" else "#dc3545" if status == "incorrect" else "#f0f2f6"
+            txt = "white" if status in ["correct", "incorrect"] else "#333"
+            style_content += f'button[key="btn_{i}"] {{ background-color: {bg} !important; color: {txt} !important; }}\n'
+        
+        st.markdown(f"<style>{style_content}</style>", unsafe_allow_html=True)
+    
+        # 2. 放置在固定高度的容器内
+        with st.container(height=550):
             grid_cols = st.columns(4) 
             for i in range(total_q):
-                status = st.session_state.results.get(i)
-                
-                # 动态颜色注入
-                if status == "correct":
-                    bg_color, txt_color = "#28a745", "white"
-                elif status == "incorrect":
-                    bg_color, txt_color = "#dc3545", "white"
-                else:
-                    bg_color, txt_color = "#f0f2f6", "#333"
-    
-                st.markdown(f"""
-                    <style>
-                    button[key="btn_{i}"] {{
-                        background-color: {bg_color} !important;
-                        color: {txt_color} !important;
-                    }}
-                    </style>
-                """, unsafe_allow_html=True)
-                
                 if grid_cols[i % 4].button(f"{i+1}", key=f"btn_{i}"):
-                    try:
-                        st.session_state.current_idx_in_list = st.session_state.shuffled_indices.index(i)
-                        st.session_state.error_mode = False
-                        st.rerun()
-                    except ValueError:
-                        pass
+                    st.session_state.current_idx_in_list = st.session_state.shuffled_indices.index(i)
+                    st.session_state.error_mode = False
+                    st.rerun()
